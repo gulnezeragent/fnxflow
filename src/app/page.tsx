@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { createClient } from '@/lib/supabase/client';
+import AuthButton from '@/components/AuthButton';
 
 interface Exercise {
   id: string;
@@ -37,6 +39,8 @@ export default function PhysitrackApp() {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [programs, setPrograms] = useState<Program[]>([]);
   const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<any>(null);
+  const supabase = createClient();
   
   // Form states
   const [newExercise, setNewExercise] = useState({ name: '', category: '', instructions: '', reps: '', sets: '', duration: '' });
@@ -44,8 +48,17 @@ export default function PhysitrackApp() {
   const [newProgram, setNewProgram] = useState({ patientId: '', exerciseIds: [] as string[], frequency: 'daily' });
 
   useEffect(() => {
+    checkUser();
     fetchData();
   }, []);
+
+  const checkUser = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    setUser(user);
+    if (!user) {
+      window.location.href = '/login';
+    }
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -125,10 +138,11 @@ export default function PhysitrackApp() {
   return (
     <div className="min-h-screen bg-slate-900 text-white">
       {/* Header */}
-      <header className="bg-blue-600 p-4">
+      <header className="bg-blue-600 p-4 flex justify-between items-center">
         <h1 className="text-2xl font-bold flex items-center gap-2">
           🏥 PhysioFlow
         </h1>
+        <AuthButton />
       </header>
 
       {/* Tabs */}
