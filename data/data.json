@@ -1,0 +1,85 @@
+{
+  "exercises": [
+    {
+      "id": "1",
+      "name": "Neck Stretches",
+      "category": "Neck",
+      "instructions": "Slowly tilt head to each side, hold for 30 seconds. Repeat 3 times.",
+      "reps": "10",
+      "sets": "3",
+      "duration": "5 min",
+      "videoUrl": ""
+    },
+    {
+      "id": "2",
+      "name": "Shoulder Rolls",
+      "category": "Shoulder",
+      "instructions": "Roll shoulders forward and backward. 10 rotations each direction.",
+      "reps": "20",
+      "sets": "2",
+      "duration": "3 min",
+      "videoUrl": ""
+    },
+    {
+      "id": "3",
+      "name": "Lumbar Stretch",
+      "category": "Lower Back",
+      "instructions": "Lie on back, pull knees to chest. Hold for 30 seconds.",
+      "reps": "10",
+      "sets": "3",
+      "duration": "5 min",
+      "videoUrl": ""
+    },
+    {
+      "id": "4",
+      "name": "Knee to Chest",
+      "category": "Lower Back",
+      "instructions": "Lie on back, pull one knee to chest. Hold 30 seconds each leg.",
+      "reps": "10 each",
+      "sets": "3",
+      "duration": "10 min",
+      "videoUrl": ""
+    },
+    {
+      "id": "5",
+      "name": "Calf Raises",
+      "category": "Lower Extremity",
+      "instructions": "Stand and raise up on toes. Hold for 3 seconds at top.",
+      "reps": "15",
+      "sets": "3",
+      "duration": "5 min",
+      "videoUrl": ""
+    }
+  ],
+  "patients": [
+    {
+      "id": "1",
+      "name": "John Smith",
+      "email": "john@email.com",
+      "phone": "604-555-0101",
+      "condition": "Lower back pain",
+      "startDate": "2026-01-15",
+      "notes": ""
+    },
+    {
+      "id": "2",
+      "name": "Jane Doe",
+      "email": "jane@email.com",
+      "phone": "604-555-0102",
+      "condition": "Neck stiffness",
+      "startDate": "2026-02-01",
+      "notes": ""
+    }
+  ],
+  "programs": [
+    {
+      "id": "1",
+      "patientId": "1",
+      "exerciseIds": ["3", "4", "5"],
+      "frequency": "daily",
+      "startDate": "2026-02-10",
+      "notes": "Focus on lower back strengthening"
+    }
+  ],
+  "compliance": []
+}
