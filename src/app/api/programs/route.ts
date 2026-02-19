@@ -1,50 +1,44 @@
 import { NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
+import { createClient } from '@supabase/supabase-js';
 
-const DATA_FILE = path.join(process.cwd(), '..', 'physitrack', 'data', 'data.json');
-
-function readData() {
-  try {
-    const data = fs.readFileSync(DATA_FILE, 'utf-8');
-    return JSON.parse(data);
-  } catch (e) {
-    return { exercises: [], patients: [], programs: [], compliance: [] };
-  }
-}
-
-function writeData(data: any) {
-  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
-}
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 export async function GET() {
-  const data = readData();
-  return NextResponse.json(data.programs);
+  const { data, error } = await supabase.from('programs').select('*').order('createdAt', { ascending: false });
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json(data || []);
 }
 
 export async function POST(request: Request) {
   const body = await request.json();
-  const data = readData();
+  const { data, error } = await supabase.from('programs').insert(body).select().single();
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json(data);
+}
+
+export async function PATCH(request: Request) {
+  const body = await request.json();
+  if (!body.id) return NextResponse.json({ error: 'ID required' }, { status: 400 });
   
-  const newProgram = {
-    id: Date.now().toString(36),
-    ...body,
-    startDate: new Date().toISOString().split('T')[0],
-  };
-  
-  data.programs.push(newProgram);
-  writeData(data);
-  
-  return NextResponse.json(newProgram);
+  const { data, error } = await supabase
+    .from('programs')
+    .update(body)
+    .eq('id', body.id)
+    .select()
+    .single();
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json(data);
 }
 
 export async function DELETE(request: Request) {
   const { searchParams } = new URL(request.url);
   const id = searchParams.get('id');
-  const data = readData();
+  if (!id) return NextResponse.json({ error: 'ID required' }, { status: 400 });
   
-  data.programs = data.programs.filter((p: any) => p.id !== id);
-  writeData(data);
-  
+  const { error } = await supabase.from('programs').delete().eq('id', id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ success: true });
 }

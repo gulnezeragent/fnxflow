@@ -20,9 +20,11 @@ export default function AuthForm() {
       if (isLogin) {
         const { error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) throw error
+        window.location.href = '/'
       } else {
         const { error } = await supabase.auth.signUp({ email, password })
         if (error) throw error
+        alert('Check your email for confirmation link!')
       }
     } catch (err: any) {
       setError(err.message)

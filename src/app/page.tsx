@@ -16,11 +16,12 @@ interface Exercise {
 
 interface Patient {
   id: string;
-  name: string;
+  firstName: string;
+  lastName: string;
   email: string;
   phone: string;
-  condition: string;
-  startDate: string;
+  dateOfBirth?: string;
+  notes?: string;
 }
 
 interface Program {
@@ -31,7 +32,7 @@ interface Program {
   startDate: string;
 }
 
-type Tab = 'exercises' | 'patients' | 'programs';
+type Tab = 'exercises' | 'patients' | 'programs' | 'therapists';
 
 export default function PhysitrackApp() {
   const [activeTab, setActiveTab] = useState<Tab>('exercises');
@@ -41,11 +42,16 @@ export default function PhysitrackApp() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
   const supabase = createClient();
-  
+
   // Form states
   const [newExercise, setNewExercise] = useState({ name: '', category: '', instructions: '', reps: '', sets: '', duration: '' });
-  const [newPatient, setNewPatient] = useState({ name: '', email: '', phone: '', condition: '' });
+  const [newPatient, setNewPatient] = useState({ firstName: '', lastName: '', email: '', phone: '', dateOfBirth: '', notes: '' });
   const [newProgram, setNewProgram] = useState({ patientId: '', exerciseIds: [] as string[], frequency: 'daily' });
+  const [editingExercise, setEditingExercise] = useState<any>(null);
+  const [editingPatient, setEditingPatient] = useState<any>(null);
+  const [therapists, setTherapists] = useState<any[]>([]);
+  const [newTherapist, setNewTherapist] = useState({ firstname: '', lastname: '', email: '', clinic: '', permission: 'therapist' });
+  const [editingTherapist, setEditingTherapist] = useState<any>(null);
 
   useEffect(() => {
     checkUser();
@@ -63,14 +69,23 @@ export default function PhysitrackApp() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [exercisesRes, patientsRes, programsRes] = await Promise.all([
+      const [exercisesRes, patientsRes, programsRes, therapistsRes] = await Promise.all([
         fetch('/api/exercises'),
         fetch('/api/patients'),
         fetch('/api/programs'),
+        fetch('/api/therapists'),
       ]);
-      setExercises(await exercisesRes.json());
-      setPatients(await patientsRes.json());
-      setPrograms(await programsRes.json());
+      const exercisesData = exercisesRes.ok ? await exercisesRes.json() : [];
+      setExercises(Array.isArray(exercisesData) ? exercisesData : []);
+
+      const patientsData = patientsRes.ok ? await patientsRes.json() : [];
+      setPatients(Array.isArray(patientsData) ? patientsData : []);
+
+      const programsData = programsRes.ok ? await programsRes.json() : [];
+      setPrograms(Array.isArray(programsData) ? programsData : []);
+
+      const therapistsData = therapistsRes.ok ? await therapistsRes.json() : [];
+      setTherapists(Array.isArray(therapistsData) ? therapistsData : []);
     } catch (err) {
       console.error('Failed to fetch data:', err);
     }
@@ -88,14 +103,92 @@ export default function PhysitrackApp() {
     fetchData();
   };
 
-  const addPatient = async () => {
-    if (!newPatient.name) return;
-    await fetch('/api/patients', {
+  const updateExercise = async () => {
+    if (!editingExercise || !editingExercise.name) return;
+    await fetch('/api/exercises', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(editingExercise),
+    });
+    setEditingExercise(null);
+    fetchData();
+  };
+
+  const addTherapist = async () => {
+    if (!newTherapist.email) return;
+    await fetch('/api/therapists', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newPatient),
+      body: JSON.stringify(newTherapist),
     });
-    setNewPatient({ name: '', email: '', phone: '', condition: '' });
+    setNewTherapist({ firstname: '', lastname: '', email: '', clinic: '', permission: 'therapist' });
+    fetchData();
+  };
+
+  const updateTherapist = async () => {
+    if (!editingTherapist || !editingTherapist.email) return;
+    await fetch('/api/therapists', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(editingTherapist),
+    });
+    setEditingTherapist(null);
+    fetchData();
+  };
+
+  const deleteTherapist = async (id: string) => {
+    await fetch('/api/therapists?id=' + id, { method: 'DELETE' });
+    fetchData();
+  };
+
+  const addPatient = async () => {
+    if (!newPatient.firstName) return;
+    const patientData = {
+      firstName: newPatient.firstName,
+      lastName: newPatient.lastName,
+      email: newPatient.email,
+      phone: newPatient.phone,
+      dateOfBirth: newPatient.dateOfBirth,
+      notes: newPatient.notes,
+    };
+    const res = await fetch('/api/patients', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patientData),
+    });
+    if (!res.ok) {
+      const error = await res.json();
+      console.error('Failed to add patient:', error);
+      alert('Failed to add patient: ' + (error?.error || 'Unknown error'));
+      return;
+    }
+    setNewPatient({ firstName: '', lastName: '', email: '', phone: '', dateOfBirth: '', notes: '' });
+    fetchData();
+  };
+
+  const updatePatient = async () => {
+    if (!editingPatient || !editingPatient.id) return;
+    const patientData = {
+      id: editingPatient.id,
+      firstName: editingPatient.firstName,
+      lastName: editingPatient.lastName,
+      email: editingPatient.email,
+      phone: editingPatient.phone,
+      dateOfBirth: editingPatient.dateOfBirth,
+      notes: editingPatient.notes,
+    };
+    const res = await fetch('/api/patients', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patientData),
+    });
+    if (!res.ok) {
+      const error = await res.json();
+      console.error('Failed to update patient:', error);
+      alert('Failed to update patient: ' + (error?.error || 'Unknown error'));
+      return;
+    }
+    setEditingPatient(null);
     fetchData();
   };
 
@@ -118,13 +211,16 @@ export default function PhysitrackApp() {
   const toggleExerciseInProgram = (id: string) => {
     setNewProgram(prev => ({
       ...prev,
-      exerciseIds: prev.exerciseIds.includes(id) 
+      exerciseIds: prev.exerciseIds.includes(id)
         ? prev.exerciseIds.filter(e => e !== id)
         : [...prev.exerciseIds, id]
     }));
   };
 
-  const getPatientName = (id: string) => patients.find(p => p.id === id)?.name || 'Unknown';
+  const getPatientName = (id: string) => {
+    const p = patients.find(p => p.id === id);
+    return p ? `${p.firstName} ${p.lastName}`.trim() : 'Unknown';
+  };
   const getExercise = (id: string) => exercises.find(e => e.id === id);
 
   if (loading) {
@@ -147,15 +243,14 @@ export default function PhysitrackApp() {
 
       {/* Tabs */}
       <div className="flex border-b border-slate-700">
-        {(['exercises', 'patients', 'programs'] as Tab[]).map(tab => (
+        {(['exercises', 'patients', 'programs', 'therapists'] as Tab[]).map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-6 py-3 font-medium capitalize ${
-              activeTab === tab 
-                ? 'bg-slate-800 text-blue-400 border-b-2 border-blue-400' 
-                : 'text-slate-400 hover:text-white'
-            }`}
+            className={`px-6 py-3 font-medium capitalize ${activeTab === tab
+              ? 'bg-slate-800 text-blue-400 border-b-2 border-blue-400'
+              : 'text-slate-400 hover:text-white'
+              }`}
           >
             {tab}
           </button>
@@ -221,6 +316,71 @@ export default function PhysitrackApp() {
               />
             </div>
 
+            {/* Edit Exercise Form */}
+            {editingExercise && (
+              <div className="bg-slate-800 p-4 rounded-xl border-2 border-blue-500">
+                <h2 className="text-lg font-semibold mb-4">Edit Exercise</h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <input
+                    type="text"
+                    placeholder="Exercise name"
+                    value={editingExercise.name || ''}
+                    onChange={e => setEditingExercise({ ...editingExercise, name: e.target.value })}
+                    className="bg-slate-700 px-3 py-2 rounded text-white"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Category"
+                    value={editingExercise.category || ''}
+                    onChange={e => setEditingExercise({ ...editingExercise, category: e.target.value })}
+                    className="bg-slate-700 px-3 py-2 rounded text-white"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Duration"
+                    value={editingExercise.duration || ''}
+                    onChange={e => setEditingExercise({ ...editingExercise, duration: e.target.value })}
+                    className="bg-slate-700 px-3 py-2 rounded text-white"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Reps"
+                    value={editingExercise.reps || ''}
+                    onChange={e => setEditingExercise({ ...editingExercise, reps: e.target.value })}
+                    className="bg-slate-700 px-3 py-2 rounded text-white"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Sets"
+                    value={editingExercise.sets || ''}
+                    onChange={e => setEditingExercise({ ...editingExercise, sets: e.target.value })}
+                    className="bg-slate-700 px-3 py-2 rounded text-white"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={updateExercise}
+                      className="bg-emerald-600 px-4 py-2 rounded hover:bg-emerald-700"
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={() => setEditingExercise(null)}
+                      className="bg-slate-600 px-4 py-2 rounded hover:bg-slate-500"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+                <textarea
+                  placeholder="Instructions"
+                  value={editingExercise.instructions || ''}
+                  onChange={e => setEditingExercise({ ...editingExercise, instructions: e.target.value })}
+                  className="w-full mt-3 bg-slate-700 px-3 py-2 rounded text-white"
+                  rows={2}
+                />
+              </div>
+            )}
+
             {/* Exercises List */}
             <div className="grid gap-4">
               {exercises.map(exercise => (
@@ -230,12 +390,20 @@ export default function PhysitrackApp() {
                       <h3 className="text-lg font-semibold">{exercise.name}</h3>
                       <span className="text-sm text-blue-400">{exercise.category}</span>
                     </div>
-                    <button
-                      onClick={() => deleteItem('exercises', exercise.id)}
-                      className="text-red-400 hover:text-red-300"
-                    >
-                      ✕
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setEditingExercise(exercise)}
+                        className="text-blue-400 hover:text-blue-300"
+                      >
+                        ✎
+                      </button>
+                      <button
+                        onClick={() => deleteItem('exercises', exercise.id)}
+                        className="text-red-400 hover:text-red-300"
+                      >
+                        ✕
+                      </button>
+                    </div>
                   </div>
                   <p className="text-slate-300 mt-2">{exercise.instructions}</p>
                   <div className="flex gap-4 mt-3 text-sm text-slate-400">
@@ -258,9 +426,16 @@ export default function PhysitrackApp() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <input
                   type="text"
-                  placeholder="Patient name"
-                  value={newPatient.name}
-                  onChange={e => setNewPatient({ ...newPatient, name: e.target.value })}
+                  placeholder="First Name"
+                  value={newPatient.firstName}
+                  onChange={e => setNewPatient({ ...newPatient, firstName: e.target.value })}
+                  className="bg-slate-700 px-3 py-2 rounded text-white"
+                />
+                <input
+                  type="text"
+                  placeholder="Last Name"
+                  value={newPatient.lastName}
+                  onChange={e => setNewPatient({ ...newPatient, lastName: e.target.value })}
                   className="bg-slate-700 px-3 py-2 rounded text-white"
                 />
                 <input
@@ -278,10 +453,17 @@ export default function PhysitrackApp() {
                   className="bg-slate-700 px-3 py-2 rounded text-white"
                 />
                 <input
+                  type="date"
+                  placeholder="Date of Birth"
+                  value={newPatient.dateOfBirth}
+                  onChange={e => setNewPatient({ ...newPatient, dateOfBirth: e.target.value })}
+                  className="bg-slate-700 px-3 py-2 rounded text-white"
+                />
+                <input
                   type="text"
-                  placeholder="Condition"
-                  value={newPatient.condition}
-                  onChange={e => setNewPatient({ ...newPatient, condition: e.target.value })}
+                  placeholder="Notes"
+                  value={newPatient.notes}
+                  onChange={e => setNewPatient({ ...newPatient, notes: e.target.value })}
                   className="bg-slate-700 px-3 py-2 rounded text-white"
                 />
                 <button
@@ -293,29 +475,120 @@ export default function PhysitrackApp() {
               </div>
             </div>
 
-            {/* Patients List */}
-            <div className="grid gap-4">
-              {patients.map(patient => (
-                <div key={patient.id} className="bg-slate-800 p-4 rounded-xl">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h3 className="text-lg font-semibold">{patient.name}</h3>
-                      <span className="text-sm text-blue-400">{patient.condition}</span>
-                    </div>
+            {/* Edit Patient Form */}
+            {editingPatient && (
+              <div className="bg-slate-800 p-4 rounded-xl border-2 border-blue-500">
+                <h2 className="text-lg font-semibold mb-4">Edit Patient</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <label className="flex flex-col">
+                    <span className="text-sm text-slate-400 mb-1">First Name</span>
+                    <input
+                      type="text"
+                      value={editingPatient.firstName || ''}
+                      onChange={e => setEditingPatient({ ...editingPatient, firstName: e.target.value })}
+                      className="bg-slate-700 px-3 py-2 rounded text-white"
+                    />
+                  </label>
+                  <label className="flex flex-col">
+                    <span className="text-sm text-slate-400 mb-1">Last Name</span>
+                    <input
+                      type="text"
+                      value={editingPatient.lastName || ''}
+                      onChange={e => setEditingPatient({ ...editingPatient, lastName: e.target.value })}
+                      className="bg-slate-700 px-3 py-2 rounded text-white"
+                    />
+                  </label>
+                  <label className="flex flex-col">
+                    <span className="text-sm text-slate-400 mb-1">Email</span>
+                    <input
+                      type="email"
+                      value={editingPatient.email || ''}
+                      onChange={e => setEditingPatient({ ...editingPatient, email: e.target.value })}
+                      className="bg-slate-700 px-3 py-2 rounded text-white"
+                    />
+                  </label>
+                  <label className="flex flex-col">
+                    <span className="text-sm text-slate-400 mb-1">Phone</span>
+                    <input
+                      type="tel"
+                      value={editingPatient.phone || ''}
+                      onChange={e => setEditingPatient({ ...editingPatient, phone: e.target.value })}
+                      className="bg-slate-700 px-3 py-2 rounded text-white"
+                    />
+                  </label>
+                  <label className="flex flex-col">
+                    <span className="text-sm text-slate-400 mb-1">Date of Birth</span>
+                    <input
+                      type="date"
+                      value={editingPatient.dateOfBirth || ''}
+                      onChange={e => setEditingPatient({ ...editingPatient, dateOfBirth: e.target.value })}
+                      className="bg-slate-700 px-3 py-2 rounded text-white"
+                    />
+                  </label>
+                  <label className="flex flex-col">
+                    <span className="text-sm text-slate-400 mb-1">Notes</span>
+                    <input
+                      type="text"
+                      value={editingPatient.notes || ''}
+                      onChange={e => setEditingPatient({ ...editingPatient, notes: e.target.value })}
+                      className="bg-slate-700 px-3 py-2 rounded text-white"
+                    />
+                  </label>
+                  <div className="flex gap-2 md:col-span-2">
                     <button
-                      onClick={() => deleteItem('patients', patient.id)}
-                      className="text-red-400 hover:text-red-300"
+                      onClick={updatePatient}
+                      className="bg-emerald-600 px-4 py-2 rounded hover:bg-emerald-700"
                     >
-                      ✕
+                      Save
+                    </button>
+                    <button
+                      onClick={() => setEditingPatient(null)}
+                      className="bg-slate-600 px-4 py-2 rounded hover:bg-slate-500"
+                    >
+                      Cancel
                     </button>
                   </div>
-                  <div className="flex gap-4 mt-3 text-sm text-slate-400">
-                    <span>📧 {patient.email}</span>
-                    <span>📞 {patient.phone}</span>
-                    <span>📅 Since {patient.startDate}</span>
-                  </div>
                 </div>
-              ))}
+              </div>
+            )}
+
+            {/* Patients List */}
+            <div className="grid gap-4">
+              {patients.length === 0 ? (
+                <p className="text-slate-400 text-center py-8">No patients yet. Add one above!</p>
+              ) : (
+                patients.map(patient => (
+                  <div key={patient.id} className="bg-slate-800 p-4 rounded-xl">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="text-lg font-semibold">{patient.firstName} {patient.lastName}</h3>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setEditingPatient(patient)}
+                          className="text-blue-400 hover:text-blue-300"
+                        >
+                          ✎
+                        </button>
+                        <button
+                          onClick={() => deleteItem('patients', patient.id)}
+                          className="text-red-400 hover:text-red-300"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                    <div className="flex gap-4 mt-3 text-sm text-slate-400">
+                      <span>📧 {patient.email}</span>
+                      <span>📞 {patient.phone}</span>
+                      {patient.dateOfBirth && <span>🎂 {patient.dateOfBirth}</span>}
+                    </div>
+                    {patient.notes && (
+                      <p className="mt-2 text-sm text-slate-300">📝 {patient.notes}</p>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
           </div>
         )}
@@ -326,7 +599,7 @@ export default function PhysitrackApp() {
             {/* Create Program Form */}
             <div className="bg-slate-800 p-4 rounded-xl">
               <h2 className="text-lg font-semibold mb-4">Create Exercise Program</h2>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
                 <select
                   value={newProgram.patientId}
@@ -335,7 +608,7 @@ export default function PhysitrackApp() {
                 >
                   <option value="">Select Patient</option>
                   {patients.map(p => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
+                    <option key={p.id} value={p.id}>{p.firstName} {p.lastName}</option>
                   ))}
                 </select>
                 <select
@@ -357,11 +630,10 @@ export default function PhysitrackApp() {
                     <button
                       key={exercise.id}
                       onClick={() => toggleExerciseInProgram(exercise.id)}
-                      className={`px-3 py-1 rounded text-sm ${
-                        newProgram.exerciseIds.includes(exercise.id)
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-slate-700 text-slate-300'
-                      }`}
+                      className={`px-3 py-1 rounded text-sm ${newProgram.exerciseIds.includes(exercise.id)
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-slate-700 text-slate-300'
+                        }`}
                     >
                       {exercise.name}
                     </button>
@@ -411,6 +683,168 @@ export default function PhysitrackApp() {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Therapists Tab - Admin Only */}
+        {activeTab === 'therapists' && therapists.some(t => t.email === user?.email && t.permission === 'admin') && (
+          <div className="space-y-6">
+            {/* Add Therapist Form */}
+            <div className="bg-slate-800 p-4 rounded-xl">
+              <h2 className="text-lg font-semibold mb-4">Add Therapist</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <label className="flex flex-col">
+                  <span className="text-sm text-slate-400 mb-1">First Name</span>
+                  <input
+                    type="text"
+                    value={newTherapist.firstname}
+                    onChange={e => setNewTherapist({ ...newTherapist, firstname: e.target.value })}
+                    className="bg-slate-700 px-3 py-2 rounded text-white"
+                  />
+                </label>
+                <label className="flex flex-col">
+                  <span className="text-sm text-slate-400 mb-1">Last Name</span>
+                  <input
+                    type="text"
+                    value={newTherapist.lastname}
+                    onChange={e => setNewTherapist({ ...newTherapist, lastname: e.target.value })}
+                    className="bg-slate-700 px-3 py-2 rounded text-white"
+                  />
+                </label>
+                <label className="flex flex-col">
+                  <span className="text-sm text-slate-400 mb-1">Email</span>
+                  <input
+                    type="email"
+                    value={newTherapist.email}
+                    onChange={e => setNewTherapist({ ...newTherapist, email: e.target.value })}
+                    className="bg-slate-700 px-3 py-2 rounded text-white"
+                  />
+                </label>
+                <label className="flex flex-col">
+                  <span className="text-sm text-slate-400 mb-1">Clinic</span>
+                  <input
+                    type="text"
+                    value={newTherapist.clinic}
+                    onChange={e => setNewTherapist({ ...newTherapist, clinic: e.target.value })}
+                    className="bg-slate-700 px-3 py-2 rounded text-white"
+                  />
+                </label>
+                <select
+                  value={newTherapist.permission}
+                  onChange={e => setNewTherapist({ ...newTherapist, permission: e.target.value })}
+                  className="bg-slate-700 px-3 py-2 rounded text-white"
+                >
+                  <option value="therapist">Therapist</option>
+                  <option value="admin">Admin</option>
+                </select>
+                <button
+                  onClick={addTherapist}
+                  className="bg-emerald-600 px-4 py-2 rounded hover:bg-emerald-700"
+                >
+                  Add Therapist
+                </button>
+              </div>
+            </div>
+
+            {/* Edit Therapist Form */}
+            {editingTherapist && (
+              <div className="bg-slate-800 p-4 rounded-xl border-2 border-emerald-500">
+                <h2 className="text-lg font-semibold mb-4">Edit Therapist</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <label className="flex flex-col">
+                    <span className="text-sm text-slate-400 mb-1">First Name</span>
+                    <input
+                      type="text"
+                      value={editingTherapist.firstname || ''}
+                      onChange={e => setEditingTherapist({ ...editingTherapist, firstname: e.target.value })}
+                      className="bg-slate-700 px-3 py-2 rounded text-white"
+                    />
+                  </label>
+                  <label className="flex flex-col">
+                    <span className="text-sm text-slate-400 mb-1">Last Name</span>
+                    <input
+                      type="text"
+                      value={editingTherapist.lastname || ''}
+                      onChange={e => setEditingTherapist({ ...editingTherapist, lastname: e.target.value })}
+                      className="bg-slate-700 px-3 py-2 rounded text-white"
+                    />
+                  </label>
+                  <label className="flex flex-col">
+                    <span className="text-sm text-slate-400 mb-1">Email</span>
+                    <input
+                      type="email"
+                      value={editingTherapist.email || ''}
+                      onChange={e => setEditingTherapist({ ...editingTherapist, email: e.target.value })}
+                      className="bg-slate-700 px-3 py-2 rounded text-white"
+                    />
+                  </label>
+                  <label className="flex flex-col">
+                    <span className="text-sm text-slate-400 mb-1">Clinic</span>
+                    <input
+                      type="text"
+                      value={editingTherapist.clinic || ''}
+                      onChange={e => setEditingTherapist({ ...editingTherapist, clinic: e.target.value })}
+                      className="bg-slate-700 px-3 py-2 rounded text-white"
+                    />
+                  </label>
+                  <label className="flex flex-col">
+                    <span className="text-sm text-slate-400 mb-1">Permission</span>
+                    <select
+                      value={editingTherapist.permission || 'therapist'}
+                      onChange={e => setEditingTherapist({ ...editingTherapist, permission: e.target.value })}
+                      className="bg-slate-700 px-3 py-2 rounded text-white"
+                    >
+                      <option value="therapist">Therapist</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                  </label>
+                  <div className="flex gap-2 items-end">
+                    <button
+                      onClick={updateTherapist}
+                      className="bg-emerald-600 px-4 py-2 rounded hover:bg-emerald-700"
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={() => setEditingTherapist(null)}
+                      className="bg-slate-600 px-4 py-2 rounded hover:bg-slate-500"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Therapists List */}
+            <div className="bg-slate-800 p-4 rounded-xl">
+              <h2 className="text-lg font-semibold mb-4">Therapists</h2>
+              <div className="space-y-3">
+                {therapists.map(therapist => (
+                  <div key={therapist.id} className="flex justify-between items-center bg-slate-700 p-3 rounded">
+                    <div>
+                      <h3 className="font-semibold">{therapist.firstname} {therapist.lastname}</h3>
+                      <p className="text-sm text-slate-400">{therapist.email} • {therapist.clinic}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setEditingTherapist(therapist)}
+                        className="text-blue-400 hover:text-blue-300"
+                      >
+                        ✎
+                      </button>
+                      <button
+                        onClick={() => deleteTherapist(therapist.id)}
+                        className="text-red-400 hover:text-red-300"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                {therapists.length === 0 && <p className="text-slate-400">No therapists yet</p>}
+              </div>
             </div>
           </div>
         )}
