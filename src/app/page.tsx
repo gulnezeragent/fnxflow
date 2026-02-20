@@ -7,11 +7,14 @@ import AuthButton from '@/components/AuthButton';
 interface Exercise {
   id: string;
   name: string;
-  category: string;
-  instructions: string;
+  description: string;
+  videoUrl: string;
+  bodyPart: string;
+  difficulty: string;
+  duration: string;
   reps: string;
   sets: string;
-  duration: string;
+  imageUrl: string;
 }
 
 interface Patient {
@@ -44,7 +47,7 @@ export default function PhysitrackApp() {
   const supabase = createClient();
 
   // Form states
-  const [newExercise, setNewExercise] = useState({ name: '', category: '', instructions: '', reps: '', sets: '', duration: '' });
+  const [newExercise, setNewExercise] = useState({ name: '', description: '', videoUrl: '', bodyPart: '', difficulty: 'beginner', duration: '', reps: '', sets: '', imageUrl: '' });
   const [newPatient, setNewPatient] = useState({ firstName: '', lastName: '', email: '', phone: '', dateOfBirth: '', notes: '' });
   const [newProgram, setNewProgram] = useState({ patientId: '', exerciseIds: [] as string[], frequency: 'daily' });
   const [editingExercise, setEditingExercise] = useState<any>(null);
@@ -94,49 +97,85 @@ export default function PhysitrackApp() {
 
   const addExercise = async () => {
     if (!newExercise.name) return;
-    await fetch('/api/exercises', {
+    // Filter out empty strings to avoid integer type errors
+    const exerciseData = Object.fromEntries(
+      Object.entries(newExercise).filter(([_, value]) => value !== '')
+    );
+    const res = await fetch('/api/exercises', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newExercise),
+      body: JSON.stringify(exerciseData),
     });
-    setNewExercise({ name: '', category: '', instructions: '', reps: '', sets: '', duration: '' });
+    if (!res.ok) {
+      const error = await res.json();
+      console.error('Failed to add exercise:', error);
+      alert('Failed to add exercise: ' + (error?.error || 'Unknown error'));
+      return;
+    }
+    setNewExercise({ name: '', description: '', videoUrl: '', bodyPart: '', difficulty: 'beginner', duration: '', reps: '', sets: '', imageUrl: '' });
     fetchData();
   };
 
   const updateExercise = async () => {
     if (!editingExercise || !editingExercise.name) return;
-    await fetch('/api/exercises', {
+    // Filter out empty strings to avoid integer type errors
+    const exerciseData = Object.fromEntries(
+      Object.entries(editingExercise).filter(([_, value]) => value !== '')
+    );
+    const res = await fetch('/api/exercises', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(editingExercise),
+      body: JSON.stringify(exerciseData),
     });
+    if (!res.ok) {
+      const error = await res.json();
+      console.error('Failed to update exercise:', error);
+      alert('Failed to update exercise: ' + (error?.error || 'Unknown error'));
+      return;
+    }
     setEditingExercise(null);
     fetchData();
   };
 
   const addTherapist = async () => {
     if (!newTherapist.email) return;
-    await fetch('/api/therapists', {
+    // Filter out null/empty id and other empty values
+    const therapistData = Object.fromEntries(
+      Object.entries(newTherapist).filter(([key, value]) => key !== 'id' && value !== '')
+    );
+    const res = await fetch('/api/therapists', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newTherapist),
+      body: JSON.stringify(therapistData),
     });
+    if (!res.ok) {
+      const error = await res.json();
+      console.error('Failed to add therapist:', error);
+      alert('Failed to add therapist: ' + (error?.error || 'Unknown error'));
+      return;
+    }
     setNewTherapist({ firstname: '', lastname: '', email: '', clinic: '', permission: 'therapist' });
     fetchData();
   };
 
   const updateTherapist = async () => {
     if (!editingTherapist || !editingTherapist.email) return;
+    // Filter out null/empty values
+    const therapistData = Object.fromEntries(
+      Object.entries(editingTherapist).filter(([_, value]) => value !== '')
+    );
     await fetch('/api/therapists', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(editingTherapist),
+      body: JSON.stringify(therapistData),
     });
     setEditingTherapist(null);
     fetchData();
   };
 
-  const deleteTherapist = async (id: string) => {
+  const deleteTherapist = async (id: string, name?: string) => {
+    const itemName = name || 'this therapist';
+    if (!confirm(`Are you sure you want to delete ${itemName}?`)) return;
     await fetch('/api/therapists?id=' + id, { method: 'DELETE' });
     fetchData();
   };
@@ -203,7 +242,9 @@ export default function PhysitrackApp() {
     fetchData();
   };
 
-  const deleteItem = async (type: string, id: string) => {
+  const deleteItem = async (type: string, id: string, name?: string) => {
+    const itemName = name || 'this item';
+    if (!confirm(`Are you sure you want to delete ${itemName}?`)) return;
     await fetch(`/api/${type}?id=${id}`, { method: 'DELETE' });
     fetchData();
   };
@@ -236,7 +277,7 @@ export default function PhysitrackApp() {
       {/* Header */}
       <header className="bg-blue-600 p-4 flex justify-between items-center">
         <h1 className="text-2xl font-bold flex items-center gap-2">
-          🏥 PhysioFlow
+          🏥 fnxFlow
         </h1>
         <AuthButton />
       </header>
@@ -274,11 +315,20 @@ export default function PhysitrackApp() {
                 />
                 <input
                   type="text"
-                  placeholder="Category (e.g. Neck, Back)"
-                  value={newExercise.category}
-                  onChange={e => setNewExercise({ ...newExercise, category: e.target.value })}
+                  placeholder="Body Part (e.g. Neck, Back)"
+                  value={newExercise.bodyPart}
+                  onChange={e => setNewExercise({ ...newExercise, bodyPart: e.target.value })}
                   className="bg-slate-700 px-3 py-2 rounded text-white"
                 />
+                <select
+                  value={newExercise.difficulty}
+                  onChange={e => setNewExercise({ ...newExercise, difficulty: e.target.value })}
+                  className="bg-slate-700 px-3 py-2 rounded text-white"
+                >
+                  <option value="beginner">Beginner</option>
+                  <option value="intermediate">Intermediate</option>
+                  <option value="advanced">Advanced</option>
+                </select>
                 <input
                   type="text"
                   placeholder="Duration (e.g. 5 min)"
@@ -308,9 +358,9 @@ export default function PhysitrackApp() {
                 </button>
               </div>
               <textarea
-                placeholder="Instructions"
-                value={newExercise.instructions}
-                onChange={e => setNewExercise({ ...newExercise, instructions: e.target.value })}
+                placeholder="Description"
+                value={newExercise.description}
+                onChange={e => setNewExercise({ ...newExercise, description: e.target.value })}
                 className="w-full mt-3 bg-slate-700 px-3 py-2 rounded text-white"
                 rows={2}
               />
@@ -330,11 +380,20 @@ export default function PhysitrackApp() {
                   />
                   <input
                     type="text"
-                    placeholder="Category"
-                    value={editingExercise.category || ''}
-                    onChange={e => setEditingExercise({ ...editingExercise, category: e.target.value })}
+                    placeholder="Body Part"
+                    value={editingExercise.bodyPart || ''}
+                    onChange={e => setEditingExercise({ ...editingExercise, bodyPart: e.target.value })}
                     className="bg-slate-700 px-3 py-2 rounded text-white"
                   />
+                  <select
+                    value={editingExercise.difficulty || 'beginner'}
+                    onChange={e => setEditingExercise({ ...editingExercise, difficulty: e.target.value })}
+                    className="bg-slate-700 px-3 py-2 rounded text-white"
+                  >
+                    <option value="beginner">Beginner</option>
+                    <option value="intermediate">Intermediate</option>
+                    <option value="advanced">Advanced</option>
+                  </select>
                   <input
                     type="text"
                     placeholder="Duration"
@@ -372,9 +431,9 @@ export default function PhysitrackApp() {
                   </div>
                 </div>
                 <textarea
-                  placeholder="Instructions"
-                  value={editingExercise.instructions || ''}
-                  onChange={e => setEditingExercise({ ...editingExercise, instructions: e.target.value })}
+                  placeholder="Description"
+                  value={editingExercise.description || ''}
+                  onChange={e => setEditingExercise({ ...editingExercise, description: e.target.value })}
                   className="w-full mt-3 bg-slate-700 px-3 py-2 rounded text-white"
                   rows={2}
                 />
@@ -388,7 +447,10 @@ export default function PhysitrackApp() {
                   <div className="flex justify-between items-start">
                     <div>
                       <h3 className="text-lg font-semibold">{exercise.name}</h3>
-                      <span className="text-sm text-blue-400">{exercise.category}</span>
+                      <span className="text-sm text-blue-400">{exercise.bodyPart}</span>
+                      {exercise.difficulty && (
+                        <span className="text-sm text-emerald-400 ml-2">({exercise.difficulty})</span>
+                      )}
                     </div>
                     <div className="flex gap-2">
                       <button
@@ -398,14 +460,14 @@ export default function PhysitrackApp() {
                         ✎
                       </button>
                       <button
-                        onClick={() => deleteItem('exercises', exercise.id)}
+                        onClick={() => deleteItem('exercises', exercise.id, exercise.name)}
                         className="text-red-400 hover:text-red-300"
                       >
                         ✕
                       </button>
                     </div>
                   </div>
-                  <p className="text-slate-300 mt-2">{exercise.instructions}</p>
+                  <p className="text-slate-300 mt-2">{exercise.description}</p>
                   <div className="flex gap-4 mt-3 text-sm text-slate-400">
                     <span>⏱ {exercise.duration}</span>
                     <span>🔄 {exercise.sets} sets</span>
@@ -571,7 +633,7 @@ export default function PhysitrackApp() {
                           ✎
                         </button>
                         <button
-                          onClick={() => deleteItem('patients', patient.id)}
+                          onClick={() => deleteItem('patients', patient.id, `${patient.firstName} ${patient.lastName}`)}
                           className="text-red-400 hover:text-red-300"
                         >
                           ✕
@@ -659,7 +721,7 @@ export default function PhysitrackApp() {
                       <span className="text-sm text-blue-400">{program.frequency}</span>
                     </div>
                     <button
-                      onClick={() => deleteItem('programs', program.id)}
+                      onClick={() => deleteItem('programs', program.id, 'this program')}
                       className="text-red-400 hover:text-red-300"
                     >
                       ✕
@@ -835,7 +897,7 @@ export default function PhysitrackApp() {
                         ✎
                       </button>
                       <button
-                        onClick={() => deleteTherapist(therapist.id)}
+                        onClick={() => deleteTherapist(therapist.id, `${therapist.firstname} ${therapist.lastname}`)}
                         className="text-red-400 hover:text-red-300"
                       >
                         ✕
